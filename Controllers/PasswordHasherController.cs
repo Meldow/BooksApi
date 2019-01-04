@@ -1,8 +1,7 @@
 ﻿namespace BooksApi.Controllers
 {
     using System;
-    using System.Security.Cryptography;
-    using Microsoft.AspNetCore.Cryptography.KeyDerivation;
+    using BooksApi.Services;
     using Microsoft.AspNetCore.Mvc;
 
     // https://github.com/aspnet/Identity/blob/master/src/Core/PasswordHasher.cs
@@ -11,27 +10,23 @@
     [Route("api/[controller]")]
     public class PasswordHasherController : ControllerBase
     {
-        [HttpGet("{password}")]
-        public ActionResult<string> Get(string password)
+        private readonly IPasswordHasherService passwordHasherService;
+
+        public PasswordHasherController(IPasswordHasherService passwordHasherService)
         {
-            // generate a 128-bit salt using a secure PRNG
-            var salt = new byte[128 / 8];
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(salt);
-            }
-            Console.WriteLine($"Salt: {Convert.ToBase64String(salt)}");
+            this.passwordHasherService = passwordHasherService ?? throw new ArgumentNullException(nameof(passwordHasherService));
+        }
 
-            // derive a 256-bit subkey (use HMACSHA1 with 10,000 iterations)
-            string hashed = Convert.ToBase64String(KeyDerivation.Pbkdf2(
-                password: password,
-                salt: salt,
-                prf: KeyDerivationPrf.HMACSHA1,
-                iterationCount: 10000,
-                numBytesRequested: 256 / 8));
-            Console.WriteLine($"Hashed: {hashed}");
+        [HttpGet("{password}")]
+        public ActionResult<string> HashPassword(string password)
+        {
+            return this.passwordHasherService.HashPassword(password) ?? (ActionResult<string>)this.NotFound();
+        }
 
-            return hashed ?? (ActionResult<string>)this.NotFound();
+        [HttpGet("{password}/{hashedPassword}")]
+        public ActionResult<bool> VerifyPassword(string password, string hashedPassword)
+        {
+            return this.passwordHasherService.VerifyPassword(password, hashedPassword);
         }
     }
 }
